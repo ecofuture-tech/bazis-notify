@@ -1,0 +1,75 @@
+# What the package is for and how to use it, for tools and AI agents (see AGENTS.md).
+# `import` paths and `check` ids are verified by tests/test_manifest.py.
+
+[package]
+name = "bazis-notify"
+summary = "stored notifications of the users: an inbox API, live delivery over bazis-ws, e-mail"
+solves = [
+    "notify users so that they see it later (stored per recipient, unread until read)",
+    "an inbox for the client: list the own notifications, unread count, read/unread, delete, read all, clear",
+    "notification texts in the language of each recipient",
+    "deliver new notifications live to the open sessions (with bazis-ws)",
+    "send a notification by e-mail through the mail backend of the core (BAZIS_EMAIL_*)",
+    "notify every user (a fan-out in batches from a background task), idempotently by a deduplication key",
+    "keep the notifications for a limited time (retention)",
+]
+requires = ["bazis", "bazis-users"]
+pairs_well = ["bazis-ws", "bazis-bg"]
+
+[[extension_points]]
+name = "notify"
+import = "bazis.contrib.notify.service.notify"
+use_when = "create the notifications of users after a write: notify(users, 'app.type', _('Title %(x)s'), _('Body'), params={...}, action=..., metadata=..., dedupe_key=..., email=False)"
+
+[[extension_points]]
+name = "notify_all"
+import = "bazis.contrib.notify.service.notify_all"
+use_when = "notify many users (a queryset) in batches, from a task of bazis-bg (is_transaction = False), with a dedupe_key so a retried run does not notify twice"
+
+[[extension_points]]
+name = "register"
+import = "bazis.contrib.notify.registry.register"
+use_when = "declare a notification type in <app>/notifications.py: register('billing.purchase_declined', title=_('...'), category='billing', severity='error', action={'route': '/billing'})"
+
+[[extension_points]]
+name = "router"
+import = "bazis.contrib.notify.router.router"
+use_when = "the API of the notifications of the user: router.register('bazis.contrib.notify.router') in the router module (BS_BAZIS_ROUTER_MODULE)"
+
+[[extension_points]]
+name = "NotificationRouteSet"
+import = "bazis.contrib.notify.routes.NotificationRouteSet"
+use_when = "subclass it (default_route = True) to add fields or actions to the notifications API"
+
+[[extension_points]]
+name = "Notification"
+import = "bazis.contrib.notify.models.Notification"
+use_when = "query the notifications in the code (read_at, notification_type, user); create them only with notify"
+
+[[extension_points]]
+name = "read_all"
+import = "bazis.contrib.notify.service.read_all"
+use_when = "mark every notification of a user read from the code (tells his sessions)"
+
+[[extension_points]]
+name = "delete_expired"
+import = "bazis.contrib.notify.service.delete_expired"
+use_when = "delete the notifications older than BAZIS_NOTIFY_RETENTION_DAYS, from a periodic task of bazis-bg"
+
+[[pitfalls]]
+text = "notify refuses a type that is not registered (UnknownNotificationTypeError): declare the types of an app in <app>/notifications.py, which bazis.contrib.notify imports when the apps are ready"
+
+[[pitfalls]]
+text = "a lazy string formatted before notify (_('...%(x)s') % {...}) is translated in the language of the request: pass the template and params=, or a function of the user, so that each recipient gets his language"
+
+[[pitfalls]]
+text = "notify inside a transaction delivers (socket, e-mail) only after the commit; a rolled back write delivers nothing, but the rows are part of the transaction"
+
+[[pitfalls]]
+text = "metadata is shown to the user and sent over the socket: keys containing token, secret, password, receipt, authorization, api_key, credential, cookie or traceback are dropped, other private data must not be put there"
+
+[[pitfalls]]
+text = "the e-mails are sent after the commit in the process of the write, one connection per notify call: notify many users from a background task (notify_all), not in a request"
+
+[[pitfalls]]
+text = "bazis.contrib.ws.messages.notify is a live message only (lost if nobody is connected); use bazis.contrib.notify.service.notify for a notification the user must see later"
