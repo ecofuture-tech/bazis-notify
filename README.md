@@ -41,11 +41,11 @@ notify(order.customer, 'billing.purchase_declined',
 - **Types**: registered by the apps (`slug`, `category`, `severity`, default `action`);
   an unknown type is refused.
 - **API** (own notifications only, anonymous 403): list with `filter=is_read=false`,
-  `filter=notification_type=...` and pagination, retrieve, `PATCH read_at` (read / unread),
+  `filter=notification_type=...` and pagination, retrieve, `PATCH read_at` (read / unread, the time is the server's),
   `DELETE`, `GET unread_count/`, `POST read_all/`, `POST clear/`.
 - **Live**: with bazis-ws, `notification_created` and `notifications_changed` (with the
   unread count) on the channel of the user after the commit.
-- **E-mail**: `email=True` sends after the commit, one batch per call, through the default
+- **E-mail**: `email=True` sends after the commit, one connection per call (a refused address is logged, the others are sent), through the default
   mailer configured by `BAZIS_EMAIL_*`.
 - **Fan-out**: `notify_all(queryset, ...)` in batches from a bazis-bg task, idempotent with
   a `dedupe_key`.

@@ -14,6 +14,7 @@
 
 from django.apps import apps
 from django.db.models import QuerySet
+from django.utils import timezone
 
 from starlette.status import HTTP_403_FORBIDDEN
 
@@ -48,8 +49,8 @@ class NotificationRouteSet(RestrictedQsRouteMixin, UserRouteBase):
     """
     The notifications of the user of the request: the list (filters by
     `notification_type`, `is_read`), an item, PATCH `read_at` (a time marks it read, null
-    unread), DELETE, and the collection actions `unread_count`, `read_all` and `clear`.
-    Nobody sees or changes the notifications of another user (404); an anonymous request
+    unread; the time is the server's), DELETE, and the collection actions `unread_count`,
+    `read_all` and `clear`. Nobody sees or changes the notifications of another user (404); an anonymous request
     is refused (403). The notifications are created by `notify`, not through the API.
     """
 
@@ -108,8 +109,21 @@ class NotificationRouteSet(RestrictedQsRouteMixin, UserRouteBase):
             raise JsonApi403Exception
         return super().route_run(*args, **kwargs)
 
+    def hook_before_update(self, item):
+        super().hook_before_update(item)
+        self.read_at_stored = item.read_at
+
     def hook_after_update(self, item):
+        """
+        The time of the reading is the server's: any `read_at` the client sends marks the
+        notification read now (a read one keeps its time), null marks it unread.
+        """
         super().hook_after_update(item)
+        if item.read_at is not None:
+            read_at = self.read_at_stored or timezone.now()
+            if item.read_at != read_at:
+                item.read_at = read_at
+                item.save(update_fields=['read_at'])
         service.notifications_changed(self.inject.user)
 
     def destroy(self, item_id: str):

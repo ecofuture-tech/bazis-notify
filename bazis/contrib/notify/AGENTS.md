@@ -66,12 +66,16 @@ notify(
 
 - The texts are rendered for each recipient inside `translation.override(user.language or
   LANGUAGE_CODE)`: a lazy string is translated there, then formatted with `params` (`%`);
-  a function `lambda user: ...` is called with the user. Do not format a lazy string
+  a function `lambda user: ...` is called with the user and gives the final text (`params`
+  are not applied to it, so a `%` in the data of the user is safe). Do not format a lazy string
   before the call (`_('...') % {...}` is translated in the language of the request).
   The rows keep the rendered texts.
-- `notify` returns the notifications it created. With `dedupe_key`, a user who already has
-  a notification with that key gets none (and no e-mail): a retried call or task does not
-  notify twice. One insert for all the recipients.
+- `notify` returns the notifications it created (loaded back, ordinary instances). With
+  `dedupe_key`, a user who already has a notification with that key gets none (no
+  e-mail, no message on the socket): a retried call or task does not notify twice. The
+  key holds while the notification exists: after a DELETE, `clear` or the retention
+  deleted it, the same key notifies again (make the key say what it is about, e.g. the
+  object and its version). One insert for all the recipients.
 - `action` and `metadata` are JSON (lazy strings and dates are converted). The keys of
   `metadata` containing `token`, `secret`, `password`, `receipt`, `authorization`,
   `api_key`, `apikey`, `credential`, `cookie` or `traceback` are dropped at any depth; the
@@ -131,13 +135,15 @@ it (re)connects: the socket delivers only while it is connected.
 `email=True` sends each created notification to `user.email` (users without one are
 skipped): the subject is the title (on one line), the text the body (the title without a
 body), in the language of the user, from `DEFAULT_FROM_EMAIL`. The messages of one
-`notify` call go after the commit in one batch through the default mailer of the project,
+`notify` call go after the commit through one connection of the default mailer of the project,
 which the core configures from the dynamic settings `BAZIS_EMAIL_BACKEND` (default
 `bazis.core.mail.DynamicSMTPEmailBackend`), `BAZIS_EMAIL_HOST`, `BAZIS_EMAIL_PORT`,
 `BAZIS_EMAIL_HOST_USER`, `BAZIS_EMAIL_HOST_PASSWORD`, `BAZIS_EMAIL_USE_TLS`,
 `BAZIS_EMAIL_USE_SSL` (`BS_BAZIS_EMAIL_*`, editable in the admin) and `DEFAULT_FROM_EMAIL`.
-A failure of the mail server is logged (Django logs the failed `on_commit` callback) and
-does not fail the write. The sending runs in the process of the write: send to many users
+Each message is sent on its own: a refused address (or one the backend cannot encode) is
+logged with the notification and the user (`bazis.contrib.notify.service`) and the others
+are sent; a mail server that cannot be reached is logged by Django (the failed `on_commit`
+callback). Neither fails the write. The sending runs in the process of the write: send to many users
 from a task (`notify_all`), not in a request. Tests get the messages in `mail.outbox`
 (Django uses the locmem backend in tests).
 
@@ -151,8 +157,9 @@ anonymous request 403 (`ERR_FORBIDDEN`), an invalid token 401.
   `filter=is_read=false` (the unread ones, e.g. on (re)connect), `filter=notification_type=billing.purchase_declined`,
   `page[limit]`, `page[offset]`. `GET /{id}/`: one notification.
 - `PATCH /{id}/` with `{"data": {"id", "type": "notify.notification", "attributes":
-  {"read_at": "<time>"}}}` marks it read, `"read_at": null` unread; any other attribute is
-  422. `DELETE /{id}/` deletes it. No create: notifications come from `notify`.
+  {"read_at": "<any time>"}}}` marks it read, `"read_at": null` unread; the time is the
+  server's (the value sent is not stored; a read notification keeps its time); any other
+  attribute is 422. `DELETE /{id}/` deletes it. No create: notifications come from `notify`.
 - `GET /unread_count/` → `{"unread_count": N}`; `POST /read_all/` → `{"read": N}`;
   `POST /clear/` (deletes all) → `{"deleted": N}`.
 - Attributes: `notification_type`, `title`, `body`, `action`, `metadata`, `read_at`,
@@ -161,9 +168,11 @@ anonymous request 403 (`ERR_FORBIDDEN`), an invalid token 401.
 
 ## Retention
 
-`delete_expired(days=None)` deletes the notifications created more than
+`delete_expired(days=None, batch_size=1000)` deletes the notifications created more than
 `BAZIS_NOTIFY_RETENTION_DAYS` days ago (read or not; `days` overrides the setting; nothing
-without either) and returns their number. Run it daily from a periodic task of bazis-bg
+without either) and returns their number. It deletes `batch_size` rows per statement (by
+the index of `dt_created`): outside a transaction each batch commits on its own. The
+deleted keys no longer deduplicate. Run it daily from a periodic task of bazis-bg
 (a `BgBase` whose `handle` calls it, with a `TaskCron` such as `"0 3 * * *"`).
 
 ## Rules

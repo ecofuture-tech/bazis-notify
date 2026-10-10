@@ -17,6 +17,7 @@ The notifications of the user through the API (`bazis.contrib.notify.router`).
 """
 
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 import pytest
 from bazis_test_utils.utils import get_api_client
@@ -204,3 +205,29 @@ def test_delete_read_all_clear(sample_app, two_users, published):
     assert client_of(sample_app, stranger).get(f'{URL}unread_count/').json() == {
         'unread_count': 1
     }
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_server_sets_the_time_of_the_reading(sample_app, two_users):
+    owner, _, own, _ = two_users
+    client = client_of(sample_app, owner)
+    item = f'{URL}{own[0].pk}/'
+
+    before = timezone.now()
+    response = client.patch(item, json_data=read_at_body(own[0].pk, '2030-01-01T00:00:00Z'))
+    after = timezone.now()
+    assert response.status_code == 200, response.text
+    read_at = Notification.objects.get(pk=own[0].pk).read_at
+    assert before <= read_at <= after
+    assert response.json()['data']['attributes']['read_at'] is not None
+
+    # a read notification keeps its time
+    response = client.patch(item, json_data=read_at_body(own[0].pk, '2020-01-01T00:00:00Z'))
+    assert response.status_code == 200, response.text
+    assert Notification.objects.get(pk=own[0].pk).read_at == read_at
+
+    # null unreads it, the next reading is now
+    client.patch(item, json_data=read_at_body(own[0].pk, None))
+    assert Notification.objects.get(pk=own[0].pk).read_at is None
+    client.patch(item, json_data=read_at_body(own[0].pk, '2020-01-01T00:00:00Z'))
+    assert Notification.objects.get(pk=own[0].pk).read_at > read_at

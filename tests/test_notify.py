@@ -348,3 +348,93 @@ def test_delete_expired(settings):
 
     # an explicit number of days wins over the setting
     assert delete_expired(days=60) == 0
+
+
+@pytest.mark.django_db(transaction=True)
+def test_returned_rows_are_ordinary_instances():
+    user = make_user('user')
+    row, = notify(user, 'users.welcome', 'Hi')
+
+    assert row.user is user
+    row.read_at = timezone.now()
+    row.save()
+    assert Notification.objects.get(pk=row.pk).read_at == row.read_at
+
+    row.title = 'Changed'
+    with pytest.raises(JsonApiItemInvalidException):
+        row.save()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_params_format_only_templates():
+    user = make_user('a%b')
+
+    row, = notify(
+        user,
+        'users.welcome',
+        lambda recipient: f'Hello, {recipient.username} (100%)',
+        NOT_INTEGER,
+        params={'value': '50%'},
+    )
+
+    assert (row.title, row.body) == ('Hello, a%b (100%)', '“50%” value must be an integer.')
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_refused_email_does_not_stop_the_others(settings, caplog):
+    settings.MAILERS = {'default': {'BACKEND': 'tests.mail.RefusingBackend'}}
+    users = [
+        make_user('first', email='first@example.com'),
+        make_user('refused', email='refused@example.com'),
+        make_user('last', email='last@example.com'),
+    ]
+
+    rows = notify(users, 'users.welcome', 'Hi', email=True)
+
+    assert sorted(m.to[0] for m in mail.outbox) == ['first@example.com', 'last@example.com']
+    refused = next(row for row in rows if row.user.username == 'refused')
+    assert f'the e-mail of the notification {refused.pk} to the user {users[1].pk} not sent' in (
+        caplog.text
+    )
+    assert 'No such user' in caplog.text
+    assert Notification.objects.count() == 3
+
+
+@pytest.mark.django_db(transaction=True)
+def test_delete_expired_in_batches():
+    user = make_user('user')
+    for number in range(5):
+        notify(user, 'users.welcome', f'Old {number}')
+    kept, = notify(user, 'users.welcome', 'Recent')
+    Notification.objects.exclude(pk=kept.pk).update(dt_created=timezone.now() - timedelta(days=10))
+
+    with CaptureQueriesContext(connection) as queries:
+        assert delete_expired(days=7, batch_size=2) == 5
+    deletes = [q for q in queries.captured_queries if q['sql'].startswith('DELETE')]
+    assert len(deletes) == 3
+    assert list(Notification.objects.values_list('pk', flat=True)) == [kept.pk]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_duplicate_is_not_published(published):
+    user = make_user('user')
+    notify(user, 'users.welcome', 'Hi', dedupe_key='once')
+    assert len(published) == 1
+
+    assert notify(user, 'users.welcome', 'Hi', dedupe_key='once') == []
+    assert len(published) == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_user_model_without_a_channel(monkeypatch, published, caplog):
+    # a user model without UserWsMixin has no ws_publish
+    monkeypatch.setattr(get_user_model(), 'ws_publish', None)
+    user = make_user('user')
+
+    rows = notify(user, 'users.welcome', 'Hi')
+    assert service.read_all(user) == 1
+    assert service.clear(user) == 1
+
+    assert len(rows) == 1
+    assert published == []
+    assert 'not published' not in caplog.text

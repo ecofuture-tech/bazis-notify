@@ -52,7 +52,7 @@ class Notification(UuidMixin, JsonApiMixin):
     read_at = models.DateTimeField(_('Read at'), null=True, blank=True)
     #: a notification with the key of an existing notification of the user is not created
     dedupe_key = models.CharField(_('Deduplication key'), max_length=255, null=True, blank=True)
-    dt_created = models.DateTimeField(_('Creation time'), auto_now_add=True)
+    dt_created = models.DateTimeField(_('Creation time'), auto_now_add=True, db_index=True)
 
     class Meta:
         verbose_name = _('Notification')

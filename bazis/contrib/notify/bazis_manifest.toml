@@ -66,10 +66,13 @@ text = "a lazy string formatted before notify (_('...%(x)s') % {...}) is transla
 text = "notify inside a transaction delivers (socket, e-mail) only after the commit; a rolled back write delivers nothing, but the rows are part of the transaction"
 
 [[pitfalls]]
+text = "a dedupe_key deduplicates only while the notification with it exists: after a DELETE, clear or delete_expired the same key notifies again; make the key name the object and its version"
+
+[[pitfalls]]
 text = "metadata is shown to the user and sent over the socket: keys containing token, secret, password, receipt, authorization, api_key, credential, cookie or traceback are dropped, other private data must not be put there"
 
 [[pitfalls]]
-text = "the e-mails are sent after the commit in the process of the write, one connection per notify call: notify many users from a background task (notify_all), not in a request"
+text = "the e-mails are sent after the commit in the process of the write, one connection per notify call (a refused address is logged, the others are sent): notify many users from a background task (notify_all), not in a request"
 
 [[pitfalls]]
 text = "bazis.contrib.ws.messages.notify is a live message only (lost if nobody is connected); use bazis.contrib.notify.service.notify for a notification the user must see later"
