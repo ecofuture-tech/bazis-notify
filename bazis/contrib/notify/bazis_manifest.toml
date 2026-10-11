@@ -19,22 +19,22 @@ pairs_well = ["bazis-ws", "bazis-bg"]
 [[extension_points]]
 name = "notify"
 import = "bazis.contrib.notify.service.notify"
-use_when = "create the notifications of users after a write: notify(users, 'app.type', _('Title %(x)s'), _('Body'), params={...}, action=..., metadata=..., dedupe_key=..., email=False)"
+use_when = "create the notifications of users after a write: notify(users, 'app.type', _('Title %(x)s'), params=..., dedupe_key=..., email=False)"
 
 [[extension_points]]
 name = "notify_all"
 import = "bazis.contrib.notify.service.notify_all"
-use_when = "notify many users (a queryset) in batches, from a task of bazis-bg (is_transaction = False), with a dedupe_key so a retried run does not notify twice"
+use_when = "notify many users in batches, from a task of bazis-bg, with a dedupe_key"
 
 [[extension_points]]
 name = "register"
 import = "bazis.contrib.notify.registry.register"
-use_when = "declare a notification type in <app>/notifications.py: register('billing.purchase_declined', title=_('...'), category='billing', severity='error', action={'route': '/billing'})"
+use_when = "declare a notification type in <app>/notifications.py"
 
 [[extension_points]]
 name = "router"
 import = "bazis.contrib.notify.router.router"
-use_when = "the API of the notifications of the user: router.register('bazis.contrib.notify.router') in the router module (BS_BAZIS_ROUTER_MODULE)"
+use_when = "the API of the notifications of the user: router.register('bazis.contrib.notify.router')"
 
 [[extension_points]]
 name = "NotificationRouteSet"
@@ -44,35 +44,35 @@ use_when = "subclass it (default_route = True) to add fields or actions to the n
 [[extension_points]]
 name = "Notification"
 import = "bazis.contrib.notify.models.Notification"
-use_when = "query the notifications in the code (read_at, notification_type, user); create them only with notify"
+use_when = "query the notifications in the code; create them only with notify"
 
 [[extension_points]]
 name = "read_all"
 import = "bazis.contrib.notify.service.read_all"
-use_when = "mark every notification of a user read from the code (tells his sessions)"
+use_when = "mark every notification of a user read from the code"
 
 [[extension_points]]
 name = "delete_expired"
 import = "bazis.contrib.notify.service.delete_expired"
-use_when = "delete the notifications older than BAZIS_NOTIFY_RETENTION_DAYS, from a periodic task of bazis-bg"
+use_when = "delete the notifications older than BAZIS_NOTIFY_RETENTION_DAYS, from a periodic task"
 
 [[pitfalls]]
-text = "notify refuses a type that is not registered (UnknownNotificationTypeError): declare the types of an app in <app>/notifications.py, which bazis.contrib.notify imports when the apps are ready"
+text = "notify refuses a type that is not registered: declare the types in <app>/notifications.py"
 
 [[pitfalls]]
-text = "a lazy string formatted before notify (_('...%(x)s') % {...}) is translated in the language of the request: pass the template and params=, or a function of the user, so that each recipient gets his language"
+text = "a lazy string formatted before notify is translated in the language of the request: pass the template and params="
 
 [[pitfalls]]
-text = "notify inside a transaction delivers (socket, e-mail) only after the commit; a rolled back write delivers nothing, but the rows are part of the transaction"
+text = "notify inside a transaction delivers only after the commit"
 
 [[pitfalls]]
-text = "a dedupe_key deduplicates only while the notification with it exists: after a DELETE, clear or delete_expired the same key notifies again; make the key name the object and its version"
+text = "a dedupe_key deduplicates only while the notification with it exists"
 
 [[pitfalls]]
-text = "metadata is shown to the user and sent over the socket: keys containing token, secret, password, receipt, authorization, api_key, credential, cookie or traceback are dropped, other private data must not be put there"
+text = "metadata is shown to the user: never put private data there"
 
 [[pitfalls]]
-text = "the e-mails are sent after the commit in the process of the write, one connection per notify call (a refused address is logged, the others are sent): notify many users from a background task (notify_all), not in a request"
+text = "the e-mails are sent in the process of the write: notify many users from a background task (notify_all)"
 
 [[pitfalls]]
-text = "bazis.contrib.ws.messages.notify is a live message only (lost if nobody is connected); use bazis.contrib.notify.service.notify for a notification the user must see later"
+text = "bazis.contrib.ws.messages.notify is a live message only; use notify of bazis-notify for what the user must see later"

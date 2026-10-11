@@ -6,6 +6,23 @@ the new ones are delivered live to the open sessions (with bazis-ws) and by e-ma
 (`email=True`). Use it for anything a user must see even if he was offline: reminders,
 deadlines, results of background work, billing events.
 
+### The sections
+
+Read a section with `package_guide("bazis-notify", "<section>")` when the step at hand
+needs it; `guide_search` finds the part of a section that answers a question. Notifying
+users needs Setup, Notification types, Creating notifications and Rules.
+
+| Section | Read it when |
+|---|---|
+| Setup | you install it: the app, the router, live delivery with bazis-ws, the retention setting |
+| Notification types | you declare the types: `register` in `<app>/notifications.py`, category, severity, action |
+| Creating notifications | the code notifies users: `notify`, the texts per recipient, `dedupe_key`, `metadata`, the commit; every user at once (`notify_all`) |
+| Live delivery (bazis-ws) | a client gets them live: the messages on the socket |
+| E-mail | a notification is also mailed (`email=True`) |
+| API | a client lists, reads and deletes the notifications of its user |
+| Retention | old notifications are deleted (`delete_expired`) |
+| Rules | before you write the code, once |
+
 ## Setup
 
 - `BS_INSTALLED_APPS` gets `bazis.contrib.notify` (a Django app: run `migrate`). It needs
