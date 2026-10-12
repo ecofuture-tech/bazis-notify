@@ -42,7 +42,8 @@ class UnknownNotificationTypeError(LookupError):
 class NotificationType:
     #: the type of the notifications (`billing.purchase_declined`), stored in them
     slug: str
-    #: the name of the type (a lazy string), for the admin and the documentation
+    #: the name of the type (a lazy string), as the app documents it: the package does not
+    #: show it (no admin, not in the API)
     title: Any = None
     #: a group of types for the client (`billing`), by default the first part of the slug
     category: str = ''
@@ -98,7 +99,3 @@ def get_type(slug: str) -> NotificationType:
             f'Notification type {slug!r} is not registered: register it in '
             f'<app>/notifications.py with bazis.contrib.notify.registry.register'
         ) from None
-
-
-def registered_types() -> list[NotificationType]:
-    return list(_types.values())
