@@ -34,7 +34,8 @@ classifiers = [
 ]
 dependencies = [
     "bazis>=2.11.0",
-    "bazis-users>=2.8.0",
+    # UserMixin.authenticated_user, in_user_language
+    "bazis-users>=2.9.0",
 ]
 
 [project.optional-dependencies]

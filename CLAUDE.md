@@ -7,8 +7,8 @@ user reads and deletes his own notifications through `bazis.contrib.notify.route
 ones are published after the commit over bazis-ws (optional) and sent by e-mail through the
 mail backend of the core (`email=True`).
 
-Security: the API shows a user only his own notifications (`restrict_queryset`) and refuses
-anonymous requests (403); `metadata` drops the keys that look like secrets, since the user
+Security: the API shows a user only his own notifications (`restrict_queryset`) and answers 401
+to a request without a valid token; `metadata` drops the keys that look like secrets, since the user
 and the socket see it. A notification is immutable except `read_at` (`validate_item`).
 
 The package code is in `bazis/contrib/notify`, the sample project used by the tests is in

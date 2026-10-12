@@ -167,8 +167,8 @@ from a task (`notify_all`), not in a request. Tests get the messages in `mail.ou
 ## API
 
 `/api/v1/notify/notification/` (the resource `notify.notification`), only the
-notifications of the user of the request; another user's notification is 404, an
-anonymous request 403 (`ERR_FORBIDDEN`), an invalid token 401.
+notifications of the user of the request; another user's notification is 404, a
+request without a valid token 401 (`UserRequiredRouteBase` of bazis-users).
 
 - `GET /`: the list, newest first, with the JSON:API filters and pagination:
   `filter=is_read=false` (the unread ones, e.g. on (re)connect), `filter=notification_type=billing.purchase_declined`,

@@ -16,13 +16,10 @@ from django.apps import apps
 from django.db.models import QuerySet
 from django.utils import timezone
 
-from starlette.status import HTTP_403_FORBIDDEN
-
 from pydantic import BaseModel
 
 from bazis.contrib.users.models_abstract import UserMixin
-from bazis.contrib.users.routes_abstract import UserRouteBase
-from bazis.core.errors import JsonApi403Exception, SchemaErrors
+from bazis.contrib.users.routes_abstract import UserRequiredRouteBase
 from bazis.core.routes_abstract.initial import http_get, http_post
 from bazis.core.routes_abstract.jsonapi import RestrictedQsRouteMixin
 from bazis.core.schemas import AccessAction, CrudAccessAction, CrudApiAction, SchemaFields
@@ -45,18 +42,17 @@ class ClearResult(BaseModel):
     deleted: int
 
 
-class NotificationRouteSet(RestrictedQsRouteMixin, UserRouteBase):
+class NotificationRouteSet(RestrictedQsRouteMixin, UserRequiredRouteBase):
     """
     The notifications of the user of the request: the list (filters by
     `notification_type`, `is_read`), an item, PATCH `read_at` (a time marks it read, null
     unread; the time is the server's), DELETE, and the collection actions `unread_count`,
-    `read_all` and `clear`. Nobody sees or changes the notifications of another user (404); an anonymous request
-    is refused (403). The notifications are created by `notify`, not through the API.
+    `read_all` and `clear`. Nobody sees or changes the notifications of another user (404);
+    a request without a valid token is 401. The notifications are created by `notify`, not
+    through the API.
     """
 
     model = apps.get_model('notify.Notification')
-    # the token is required: OpenAPI declares it so (the anonymous user gets 403)
-    auth_required = True
     actions_exclude = [
         'action_create',
         'action_schema_create',
@@ -82,10 +78,6 @@ class NotificationRouteSet(RestrictedQsRouteMixin, UserRouteBase):
     }
 
     @classmethod
-    def route_responses(cls, route_ctx):
-        return {**super().route_responses(route_ctx), HTTP_403_FORBIDDEN: {'model': SchemaErrors}}
-
-    @classmethod
     def restrict_queryset(
         cls, qs: QuerySet, access_action: AccessAction, user=None, **kwargs
     ) -> QuerySet:
@@ -93,9 +85,7 @@ class NotificationRouteSet(RestrictedQsRouteMixin, UserRouteBase):
         The notifications of the user (without one, the authenticated user of the request);
         none for an anonymous user.
         """
-        if user is None:
-            user = UserMixin.CTX_USER_REQUEST.get()
-        if user is None or user.is_anonymous:
+        if (user := UserMixin.authenticated_user(user)) is None:
             return qs.none()
         return super().restrict_queryset(qs, access_action, user=user, **kwargs).filter(user=user)
 
@@ -103,11 +93,6 @@ class NotificationRouteSet(RestrictedQsRouteMixin, UserRouteBase):
         return self.restrict_queryset(
             super().get_queryset(), CrudAccessAction.VIEW, user=self.inject.user
         )
-
-    def route_run(self, *args, **kwargs):
-        if getattr(self.inject.user, 'is_anonymous', True):
-            raise JsonApi403Exception
-        return super().route_run(*args, **kwargs)
 
     def hook_before_update(self, item):
         super().hook_before_update(item)

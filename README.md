@@ -40,7 +40,7 @@ notify(order.customer, 'billing.purchase_declined',
   at most one notification per user and `dedupe_key`.
 - **Types**: registered by the apps (`slug`, `category`, `severity`, default `action`);
   an unknown type is refused.
-- **API** (own notifications only, anonymous 403): list with `filter=is_read=false`,
+- **API** (own notifications only, 401 without a valid token): list with `filter=is_read=false`,
   `filter=notification_type=...` and pagination, retrieve, `PATCH read_at` (read / unread, the time is the server's),
   `DELETE`, `GET unread_count/`, `POST read_all/`, `POST clear/`.
 - **Live**: with bazis-ws, `notification_created` and `notifications_changed` (with the

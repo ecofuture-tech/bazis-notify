@@ -108,7 +108,10 @@ def test_filters_and_pagination(sample_app, two_users):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_anonymous_is_refused(sample_app, two_users):
+def test_a_request_without_a_user_is_unauthorized(sample_app, two_users):
+    """
+    Without a token or with an invalid one every route is 401.
+    """
     owner, _, own, _ = two_users
     client = client_of(sample_app)
     item = f'{URL}{own[0].pk}/'
@@ -122,13 +125,16 @@ def test_anonymous_is_refused(sample_app, two_users):
         client.post(f'{URL}read_all/'),
         client.post(f'{URL}clear/'),
     ):
-        assert response.status_code == 403, response.text
-        assert response.json()['errors'][0]['code'] == 'ERR_FORBIDDEN'
+        assert response.status_code == 401, response.text
     assert Notification.objects.filter(user=owner).count() == 2
 
-    # an invalid token is not anonymous
     response = get_api_client(sample_app, 'a.b.c').get(URL)
     assert response.status_code == 401
+
+    # the code of UserRequiredRouteBase, as for every route that requires a user
+    operation = sample_app.openapi()['paths'][URL]['get']
+    assert '401' in operation['responses'] and '403' not in operation['responses']
+    assert operation['security'] == [{'OAuth2PasswordBearer': []}]
 
 
 @pytest.mark.django_db(transaction=True)
