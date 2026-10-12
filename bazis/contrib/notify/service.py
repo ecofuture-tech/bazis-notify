@@ -36,8 +36,10 @@ from django.core.mail import EmailMessage, mailers
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.db.models import Count, QuerySet
-from django.utils import timezone, translation
+from django.utils import timezone
 from django.utils.functional import Promise
+
+from bazis.contrib.users.models_abstract import in_user_language
 
 from .models import Notification
 from .registry import get_type
@@ -93,7 +95,7 @@ def notify(
     notification_type = get_type(notification_type)
     rows = []
     for user in _recipients(users):
-        with translation.override(getattr(user, 'language', None) or settings.LANGUAGE_CODE):
+        with in_user_language(user):
             rows.append(
                 Notification(
                     user=user,

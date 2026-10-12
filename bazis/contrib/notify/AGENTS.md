@@ -81,8 +81,8 @@ notify(
 )
 ```
 
-- The texts are rendered for each recipient inside `translation.override(user.language or
-  LANGUAGE_CODE)`: a lazy string is translated there, then formatted with `params` (`%`);
+- The texts are rendered for each recipient inside `in_user_language(user)` of bazis-users
+  (`user.language`, else LANGUAGE_CODE): a lazy string is translated there, then formatted with `params` (`%`);
   a function `lambda user: ...` is called with the user and gives the final text (`params`
   are not applied to it, so a `%` in the data of the user is safe). Do not format a lazy string
   before the call (`_('...') % {...}` is translated in the language of the request).
