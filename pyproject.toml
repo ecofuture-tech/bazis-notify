@@ -33,7 +33,7 @@ classifiers = [
     "Framework :: FastAPI",
 ]
 dependencies = [
-    "bazis>=2.11.0",
+    "bazis>=2.16.0",
     # UserMixin.authenticated_user, in_user_language
     "bazis-users>=2.9.0",
 ]
